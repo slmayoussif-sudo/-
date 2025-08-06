@@ -1,34 +1,115 @@
-# Gradle files
-.gradle/
-build/
+// news_model.dart
+class NewsItem {
+  final String title;
+  final String link;
+  final String description;
+  final String? imageUrl;
 
-# Local configuration file (sdk path, etc)
-local.properties
+  NewsItem({required this.title, required this.link, required this.description, this.imageUrl});
+}
+// home_screen.dart
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:xml/xml.dart' as xml;
+import 'news_model.dart';
+import 'details_screen.dart';
 
-# Log/OS Files
-*.log
+class HomeScreen extends StatefulWidget {
+  @override Widget build(BuildContext c) => const HomeScreenState();
+}
 
-# Android Studio generated files and folders
-captures/
-.externalNativeBuild/
-.cxx/
-*.aab
-*.apk
-output-metadata.json
+class HomeScreenState extends State<HomeScreen> {
+  List<NewsItem> _items = [];
+  bool _loading = true;
 
-# IntelliJ
-*.iml
-.idea/
-misc.xml
-deploymentTargetDropDown.xml
-render.experimental.xml
+  @override void initState(){
+    super.initState();
+    fetchRss();
+  }
 
-# Keystore files
-*.jks
-*.keystore
+  Future fetchRss() async {
+    final resp = await http.get(Uri.parse('https://shafah.com/RSS1.xml'));
+    if (resp.statusCode == 200){
+      final doc = xml.XmlDocument.parse(resp.body);
+      final elements = doc.findAllElements('item');
+      _items = elements.map((node){
+        final title = node.getElement('title')?.text ?? '';
+        final link = node.getElement('link')?.text ?? '';
+        final desc = node.getElement('description')?.text ?? '';
+        // صور داخل description؟ يمكنك استخراجها بـ regex إذا تُضمّن markdown
+        return NewsItem(title: title, link: link, description: desc);
+      }).toList();
+    }
+    setState((){ _loading = false; });
+  }
 
-# Google Services (e.g. APIs or Firebase)
-google-services.json
+  @override
+  Widget build(BuildContext context){
+    return Scaffold(
+      appBar: AppBar(title: const Text('صحيفة شَفَاه'), centerTitle: true),
+      body: _loading
+        ? const Center(child: CircularProgressIndicator())
+        : ListView.builder(
+            itemCount: _items.length,
+            itemBuilder:(c,i){
+              final news = _items[i];
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 8, horizontal:16),
+                child: ListTile(
+                  title: Text(news.title, textAlign: TextAlign.right),
+                  subtitle: Text(news.description, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.right),
+                  onTap: ()=> Navigator.push(context, MaterialPageRoute(builder: (_)=> DetailsScreen(item: news))),
+                ),
+              );
+            },
+          ),
+    );
+  }
+}
 
-# Android Profiling
-*.hprof
+// details_screen.dart
+import 'package:flutter/material.dart';
+import 'news_model.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+
+class DetailsScreen extends StatelessWidget {
+  final NewsItem item;
+  const DetailsScreen({required this.item});
+
+  @override Widget build(BuildContext c){
+    return Scaffold(
+      appBar: AppBar(title: const Text('تفاصيل الخبر'), centerTitle: true),
+      body: WebView(initialUrl: item.link, javascriptMode: JavascriptMode.unrestricted),
+    );
+  }
+}
+
+// main.dart
+import 'package:flutter/material.dart';
+import 'screens/home_screen.dart';
+
+void main() => runApp(const MyApp());
+
+class MyApp extends StatelessWidget {
+  const MyApp();
+  @override Widget build(BuildContext c){
+    return MaterialApp(
+      title: 'Shafah News',
+      theme: ThemeData(useMaterial3: true, fontFamily: 'Roboto'),
+      debugShowCheckedModeBanner: false,
+      home: HomeScreen(),
+      locale: const Locale('ar'),
+      supportedLocales: const [Locale('ar')],
+    );
+  }
+}
+
+
+
+
+
+
+
+
+
+
